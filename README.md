@@ -1,6 +1,6 @@
 # feedBack Plugin Template
 
-A reference template for creating [feedBack plugins](https://github.com/get-flashbacks/feedback-plugin-spec).
+A reference template for creating [feedBack plugins](https://github.com/got-feedBack/feedback-plugin-spec).
 
 ## ⚠️ DISCLAIMER AND WARRANTY
 
