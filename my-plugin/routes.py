@@ -91,7 +91,12 @@ def setup(app: FastAPI, context: dict) -> None:
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
-                if int(content_length) > MAX_SETTINGS_BODY_BYTES:
+                content_length_value = int(content_length)
+                if content_length_value < 0:
+                    return JSONResponse(
+                        {"error": "invalid Content-Length header"}, status_code=400
+                    )
+                if content_length_value > MAX_SETTINGS_BODY_BYTES:
                     return JSONResponse(
                         {"error": "request body too large"}, status_code=413
                     )
