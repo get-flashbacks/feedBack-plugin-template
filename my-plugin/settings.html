@@ -44,7 +44,7 @@
     <label>
       <input
         type="checkbox"
-        data-setting="enable-animations"
+        data-setting="enable_animations"
         class="my-plugin-settings__enable-animations"
       />
       Enable animations
@@ -107,6 +107,8 @@
             const key = input.dataset.setting;
             if (input.type === "checkbox") {
               formData[key] = input.checked;
+            } else if (input.type === "range") {
+              formData[key] = Number(input.value);
             } else {
               formData[key] = input.value;
             }

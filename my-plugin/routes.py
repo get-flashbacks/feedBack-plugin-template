@@ -16,11 +16,24 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 PLUGIN_ID = "my-plugin"
+MAX_SETTINGS_BODY_BYTES = 16 * 1024
 _DEFAULTS = {
     "color": "indigo",
     "intensity": 5,
     "enable_animations": True,
 }
+_COLORS = frozenset({"indigo", "crimson", "emerald", "amber"})
+
+
+def _is_valid_setting(name: str, value: object) -> bool:
+    """Return whether a setting value matches the template schema."""
+    if name == "color":
+        return isinstance(value, str) and value in _COLORS
+    if name == "intensity":
+        return type(value) is int and 0 <= value <= 10
+    if name == "enable_animations":
+        return type(value) is bool
+    return False
 
 
 def setup(app: FastAPI, context: dict) -> None:
@@ -41,7 +54,13 @@ def setup(app: FastAPI, context: dict) -> None:
         try:
             data = json.loads(config_file.read_text(encoding="utf-8"))
             # Merge with defaults to handle missing keys in old configs
-            return {**_DEFAULTS, **data} if isinstance(data, dict) else dict(_DEFAULTS)
+            if not isinstance(data, dict):
+                return dict(_DEFAULTS)
+            settings = dict(_DEFAULTS)
+            for key, value in data.items():
+                if _is_valid_setting(key, value):
+                    settings[key] = value
+            return settings
         except (OSError, ValueError) as exc:
             log.warning("%s: unreadable config, using defaults: %s", PLUGIN_ID, exc)
             return dict(_DEFAULTS)
@@ -66,12 +85,31 @@ def setup(app: FastAPI, context: dict) -> None:
     async def set_settings(request: Request) -> JSONResponse:
         """Update settings.
 
-        Accepts a JSON object with any keys. Unknown keys are ignored;
-        missing keys retain their previous values.
+        Accepts a bounded JSON object containing recognized settings. Missing
+        keys retain their previous values.
         """
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > MAX_SETTINGS_BODY_BYTES:
+                    return JSONResponse(
+                        {"error": "request body too large"}, status_code=413
+                    )
+            except ValueError:
+                return JSONResponse(
+                    {"error": "invalid Content-Length header"}, status_code=400
+                )
+
+        body = bytearray()
         try:
-            incoming = await request.json()
-        except Exception as exc:
+            async for chunk in request.stream():
+                if len(body) + len(chunk) > MAX_SETTINGS_BODY_BYTES:
+                    return JSONResponse(
+                        {"error": "request body too large"}, status_code=413
+                    )
+                body.extend(chunk)
+            incoming = json.loads(body)
+        except (UnicodeDecodeError, ValueError) as exc:
             return JSONResponse(
                 {"error": f"invalid JSON: {exc}"}, status_code=400
             )
@@ -79,6 +117,16 @@ def setup(app: FastAPI, context: dict) -> None:
         if not isinstance(incoming, dict):
             return JSONResponse(
                 {"error": "body must be a JSON object"}, status_code=400
+            )
+
+        unknown_keys = incoming.keys() - _DEFAULTS.keys()
+        if unknown_keys:
+            return JSONResponse(
+                {"error": "body contains unknown settings"}, status_code=400
+            )
+        if not all(_is_valid_setting(key, value) for key, value in incoming.items()):
+            return JSONResponse(
+                {"error": "body contains invalid setting values"}, status_code=400
             )
 
         # Merge incoming settings with existing ones
