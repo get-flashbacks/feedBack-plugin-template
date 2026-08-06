@@ -114,9 +114,9 @@ def setup(app: FastAPI, context: dict) -> None:
                     )
                 body.extend(chunk)
             incoming = json.loads(body)
-        except (UnicodeDecodeError, ValueError) as exc:
+        except (UnicodeDecodeError, ValueError):
             return JSONResponse(
-                {"error": f"invalid JSON: {exc}"}, status_code=400
+                {"error": "invalid JSON body"}, status_code=400
             )
 
         if not isinstance(incoming, dict):
