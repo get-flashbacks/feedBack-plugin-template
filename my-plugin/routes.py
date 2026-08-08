@@ -8,6 +8,7 @@ Demonstrates spec §7 best practices:
   * setup() validates before registering any route.
 """
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -134,13 +135,18 @@ def setup(app: FastAPI, context: dict) -> None:
                 {"error": "body contains invalid setting values"}, status_code=400
             )
 
-        # Merge incoming settings with existing ones
-        merged = {**_read(), **incoming}
-
-        # Persist the merged settings
-        try:
+        def _merge_and_persist() -> dict:
+            """Merge incoming settings with existing ones and persist. Runs
+            off the event loop (asyncio.to_thread below) since _read() and
+            the write below are blocking filesystem calls, and set_settings
+            must stay `async def` to stream the request body above."""
+            merged = {**_read(), **incoming}
             config_dir.mkdir(parents=True, exist_ok=True)
             config_file.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            return merged
+
+        try:
+            merged = await asyncio.to_thread(_merge_and_persist)
             log.info("%s: settings updated", PLUGIN_ID)
         except Exception as exc:
             log.error("%s: failed to write settings: %s", PLUGIN_ID, exc)
