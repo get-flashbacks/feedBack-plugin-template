@@ -11,5 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `nav` field in `my-plugin/plugin.json` (`{ "label": "My Plugin", "screen": "plugin-my-plugin" }`) so the plugin registers a sidebar entry.
 - `AGENTS.md` — reference guide for AI assistants/contributors covering the actual API shape, plugin conventions, known code notes, and a verification checklist.
+- `CLAUDE.md` — agent guide covering the template-vs-plugin distinction, feedBack app context, and two corrections to `AGENTS.md` (the `screen`-key container gate, and the spec-vs-Host folder/id mismatch behavior).
 
 <!-- Add entries under Added, Changed, Deprecated, Removed, Fixed, or Security as changes land. -->
