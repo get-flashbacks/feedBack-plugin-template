@@ -68,20 +68,28 @@ files loaded at runtime.
 
 ## File map, API shape, conventions, checklist, pitfalls
 
-See [`AGENTS.md`](AGENTS.md) for the file table, the demo's actual API
-shape, the feedBack plugin-contract conventions, known code notes, the
-verification checklist, and common pitfalls — this file doesn't repeat
-that content. Two corrections to it, both load-bearing enough to call out
-here rather than silently fix in place:
+@AGENTS.md
+
+That file has the file table, the demo's actual API shape, the feedBack
+plugin-contract conventions, known code notes, the verification
+checklist, and common pitfalls — this file doesn't repeat that content.
+Two corrections to it, both load-bearing enough to call out here rather
+than silently fix in place:
 
 - **The container-mount convention** ("screen.js finds its own root via
   `document.getElementById('plugin-<id>')`") is incomplete: the Host only
   creates that container when the manifest declares a top-level `screen`
-  key (its `has_screen` gate). `my-plugin/plugin.json` in this template
-  has **no** `screen` key, so the `plugin-my-plugin` container is never
-  created as shipped, and the checklist's "clicking the counter button"
-  step doesn't apply until a real plugin adds `"screen": "screen.html"`
-  (or similar) to its manifest.
+  key (its `has_screen` gate — `plugins/__init__.py`'s
+  `"has_screen": bool(manifest.get("screen"))`, consumed by
+  `static/js/plugin-loader.js`'s container-creation site). `script` is
+  injected independently of `has_screen`, so a script-only manifest still
+  runs `screen.js` against a DOM where that container was never created.
+  `my-plugin/plugin.json` in this template has **no** `screen` key (and
+  no `screen.html` file), so `plugin-my-plugin` is never created as
+  shipped, `screen.js`'s root resolves to `null`, and the checklist's
+  "clicking the counter button" step doesn't apply until a real plugin
+  adds both `"screen": "screen.html"` to its manifest **and** the file
+  itself.
 - **The folder/id mismatch consequence** ("a mismatch is a silent skip at
   plugin discovery") is spec language, not what the shipped
   `get-flashbacks/feedBack` Host actually does — see the note in "This
