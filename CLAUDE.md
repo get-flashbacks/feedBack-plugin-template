@@ -7,9 +7,13 @@ a real plugin id — it's a placeholder directory meant to be copied,
 renamed, and rewritten. Until that happens:
 
 - `my-plugin/plugin.json`'s `id: "my-plugin"` and the folder name
-  `my-plugin/` are meant to be changed together (the folder name **must**
-  equal the manifest `id`, case-sensitive — a mismatch is a silent skip at
-  plugin discovery in every real feedBack host).
+  `my-plugin/` are meant to be changed together. The plugin-spec (see
+  below) states a folder/id mismatch is discovery-fatal, but the shipped
+  `get-flashbacks/feedBack` Host is more permissive: the loader registers
+  a plugin by its manifest `id` regardless of folder name, and a
+  mismatch only affects `bundled: true` duplicate-resolution behavior —
+  it isn't a silent skip there. Match them anyway; the spec is stricter,
+  and relying on the Host's leniency is not a documented contract.
 - Every route in `routes.py` is namespaced `/api/plugins/my-plugin/...` and
   needs the same rename.
 - The counter/settings behavior in `screen.js`/`settings.html` is a demo
@@ -46,10 +50,12 @@ files loaded at runtime.
 - **Canonical app repo:** `got-feedBack/feedBack`. **This org's fork:**
   `get-flashbacks/feedBack` (personal fork with fork-specific features).
 - **The authoritative plugin contract** lives in
-  [`got-feedBack/feedback-plugin-spec`](https://github.com/got-feedBack/feedback-plugin-spec)
-  (spec) — this repo's own README already states the spec takes precedence
-  over anything here if the two conflict. Read the spec before trusting
-  this template's conventions for anything non-obvious.
+  [`get-flashbacks/feedback-plugin-spec`](https://github.com/get-flashbacks/feedback-plugin-spec)
+  — this org's own normative fork of the upstream
+  [`got-feedBack/feedback-plugin-spec`](https://github.com/got-feedBack/feedback-plugin-spec).
+  This repo's own README already states the spec takes precedence over
+  anything here if the two conflict. Read the spec before trusting this
+  template's conventions for anything non-obvious.
 - feedBack's own `CLAUDE.md` (in the core repo) documents the full plugin
   contract in far more depth than this template attempts to demonstrate:
   the `setRenderer` visualization lifecycle, capability domains
@@ -60,55 +66,23 @@ files loaded at runtime.
   demonstrates the smallest possible slice (screen + settings + routes) —
   don't assume it's a complete reference for anything beyond that slice.
 
-## Files
+## File map, API shape, conventions, checklist, pitfalls
 
-| File | Purpose |
-|---|---|
-| `my-plugin/plugin.json` | Manifest — id `my-plugin`, nav entry, script/styles/settings/routes, type, icon, minHost |
-| `my-plugin/screen.js` | Client screen logic — finds its root by `plugin-<id>`, wires up an example counter, loads persisted settings |
-| `my-plugin/settings.html` | Settings panel markup, grouped under `settings.category` |
-| `my-plugin/routes.py` | FastAPI `setup(app, context)` — registers GET/POST `/api/plugins/my-plugin/settings` with schema validation and persistence |
-| `my-plugin/assets/plugin.css` | Styling scoped to the plugin |
-| `my-plugin/README.md` | Per-plugin documentation for whoever copies this template |
+See [`AGENTS.md`](AGENTS.md) for the file table, the demo's actual API
+shape, the feedBack plugin-contract conventions, known code notes, the
+verification checklist, and common pitfalls — this file doesn't repeat
+that content. Two corrections to it, both load-bearing enough to call out
+here rather than silently fix in place:
 
-## Actual API shape (of the demo, before renaming)
-
-- **Routes:** `GET /api/plugins/my-plugin/settings`, `POST /api/plugins/my-plugin/settings`
-- **Settings schema:** `{color: "indigo"|"crimson"|"emerald"|"amber", intensity: int 0-10, enable_animations: bool}`
-- **GET response:** current settings, merged with defaults for any missing keys
-- **POST body:** a JSON object containing a subset of recognized settings; unknown keys or invalid values return `400`
-- **POST limits:** request body capped at `MAX_SETTINGS_BODY_BYTES` (16 KiB); oversized or malformed bodies return `413`/`400`
-- **Persistence:** settings are written to `<config_dir>/my-plugin.json` off the event loop via `asyncio.to_thread`
-
-## Key conventions (feedBack plugin contract)
-
-- **plugin.json id must match directory name** — `my-plugin` == `my-plugin/`
-- **Nav screen** uses `"nav": { "label": "My Plugin", "screen": "plugin-my-plugin" }`
-- **screen.js finds its own root** via `document.getElementById('plugin-<id>')` — the Host injects markup into that container
-- **Settings persist server-side**, not in browser storage — always go through the plugin's own routes
-- **routes.py exports `setup(app, context)`** — receives the FastAPI app and a context dict with `config_dir` and `log`
-- **Configuration validation happens once in `setup()`**, before any route is registered, so a broken config fails plugin load loudly rather than failing silently on first request
-- **API path** is `/api/plugins/<plugin_id>/<route>`
-- **No build step** — vanilla JS, no npm
-
-## Known issues / code notes
-
-- `screen.js` uses a `window[\`__${PLUGIN_ID}_setup\`]` guard to avoid double-initializing on re-hydration.
-- `loadSettings()` fails soft on fetch errors (`console.warn`) rather than throwing, so a settings-load failure degrades the screen instead of crashing it.
-- `_is_valid_setting()` in `routes.py` uses `type(value) is int` / `type(value) is bool` (not `isinstance`) specifically to reject `bool` being accepted where `int` is expected (Python's `bool` is an `int` subclass).
-
-## Verification checklist
-
-1. Plugin loads without server errors (`setup()` validates config before registering routes)
-2. Nav entry "My Plugin" appears in sidebar
-3. Clicking the counter button increments the on-screen counter
-4. GET `/api/plugins/my-plugin/settings` returns defaults on first load
-5. POSTing a valid settings subset persists and is reflected on next GET
-6. POSTing an unknown key or invalid value returns `400`
-7. Oversized POST body returns `413`
-
-## Common pitfalls
-
-- **Folder name must equal `plugin.json` id**, including case
-- **Route collisions** — always prefix with `/api/plugins/<id>/`
-- **FastAPI POST routes** need `from fastapi import Request` and `async def route(request: Request)` reading the body via a bounded stream, not `await request.json()` directly, if you want the size cap to apply before full deserialization
+- **The container-mount convention** ("screen.js finds its own root via
+  `document.getElementById('plugin-<id>')`") is incomplete: the Host only
+  creates that container when the manifest declares a top-level `screen`
+  key (its `has_screen` gate). `my-plugin/plugin.json` in this template
+  has **no** `screen` key, so the `plugin-my-plugin` container is never
+  created as shipped, and the checklist's "clicking the counter button"
+  step doesn't apply until a real plugin adds `"screen": "screen.html"`
+  (or similar) to its manifest.
+- **The folder/id mismatch consequence** ("a mismatch is a silent skip at
+  plugin discovery") is spec language, not what the shipped
+  `get-flashbacks/feedBack` Host actually does — see the note in "This
+  repo is a template, not a plugin" above.
