@@ -43,8 +43,8 @@ plugin is a directory with a `plugin.json` manifest that can declare a
 client screen (`script`), a settings panel (`settings.html` + backend
 persistence), namespaced server routes (`routes.py`), and/or (for
 visualization plugins) a `setRenderer` factory that takes over the main
-note highway's drawing. Core discovers and loads plugins by directory name
-matching manifest `id`; there's no compiled/bundled plugin format — plain
+note highway's drawing. Core registers each plugin by its manifest `id`
+regardless of folder name; there's no compiled/bundled plugin format — plain
 files loaded at runtime.
 
 - **Canonical app repo:** `got-feedBack/feedBack`. **This org's fork:**
