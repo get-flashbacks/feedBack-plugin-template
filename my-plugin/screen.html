@@ -1,0 +1,30 @@
+<!--
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  Client screen markup for my-plugin.
+
+  The Host creates the container <div id="plugin-my-plugin" class="screen"> and
+  sets its innerHTML from this file, then runs screen.js (spec §6.1). screen.js
+  finds the container by id and wires up the counter and the persisted-settings
+  display from the data-role hooks below.
+
+  Keep everything scoped under the plugin's own class (.my-plugin) so nothing
+  leaks into the rest of the app (spec §6.3, §6.4).
+-->
+<div class="my-plugin">
+  <h2>My Plugin</h2>
+
+  <section>
+    <h3>Counter</h3>
+    <p class="my-plugin__row">
+      <button type="button" data-role="increment-button">Increment</button>
+      <span data-role="counter">0</span>
+    </p>
+  </section>
+
+  <section>
+    <h3>Persisted settings</h3>
+    <p class="my-plugin__row">
+      Active color: <span data-role="color-display">indigo</span>
+    </p>
+  </section>
+</div>

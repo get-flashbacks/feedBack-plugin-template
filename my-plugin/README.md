@@ -10,6 +10,7 @@ This template demonstrates a complete, working feedBack plugin that includes:
 
 | Surface | File | Manifest key |
 |---|---|---|
+| Client screen markup | `screen.html` | `screen` |
 | Client screen | `screen.js` | `script` |
 | Styles | `assets/plugin.css` | `styles` |
 | Settings panel | `settings.html` | `settings` |
@@ -25,6 +26,11 @@ Before anything else, choose a unique `id` for your plugin. The folder name **mu
 
 - **Rename** the `my-plugin/` folder to your chosen name (e.g., `tuner`, `drum-highway-3d`).
 - **Update** `plugin.json` to set `"id": "<your-new-id>"` to match the folder name.
+- **Update the hard-coded id everywhere it appears** — the example hard-codes `my-plugin` in several places, and every one has to move to the new id or the screen container lookup and the `/api/plugins/<id>/...` routes will point at the old name:
+  - `plugin.json` → `"id"` (plus `name`, `description`, `icon` in the same file)
+  - `screen.js` → the `PLUGIN_ID` constant
+  - `settings.html` → the `PLUGIN_ID` constant
+  - `routes.py` → the `PLUGIN_ID` constant (it also derives the route namespace)
 - Use **lowercase alphanumeric with `-` or `_` separators** (e.g., `^[a-z0-9][a-z0-9_-]*$`).
 
 **Important:** The `id` is permanent. Changing it orphans users' saved settings and breaks derived names across the app. Choose it carefully and don't rename later.
@@ -41,7 +47,10 @@ Open `plugin.json` and customize:
 
 ### 3. Edit the screen
 
-Update `screen.js` to implement your plugin's functionality. The script:
+The screen has two halves:
+
+- **`screen.html`** — the markup. The Host creates a container `<div id="plugin-<id>" class="screen">` and sets its innerHTML from this file, so it must exist and be named `screen.html` (the current Host hardcodes that fetch path and ignores the manifest `screen` value). The example markup exposes `data-role="increment-button"`, `data-role="counter"`, and `data-role="color-display"` hooks that `screen.js` wires up.
+- **`screen.js`** — the behavior. Implement your plugin's functionality here. The script:
 
 - **Runs on load:** The Host executes it once when the screen is first displayed.
 - **Is self-executing:** You don't export a function for the Host to call. Set up everything you need when the script runs.
@@ -88,6 +97,17 @@ Customize `assets/plugin.css` for your plugin's visual appearance. Remember:
 - **Scope all selectors** to your plugin's classes (`.my-plugin`, `.my-plugin-settings`) so styles don't leak.
 - **Don't mutate the app shell.** Use the Host's contribution registries to add to shared surfaces (spec §6.3).
 - The Host applies these styles only while your screen is active, then unloads them.
+
+## Testing the example
+
+The template ships a pytest suite for the manifest/screen contract and the settings routes:
+
+```bash
+pip install -r requirements-dev.txt   # from the template repo root
+pytest -q
+```
+
+The tests discover the plugin by scanning for `plugin.json`, so they keep working after you rename the folder (keep them, they're yours).
 
 ## How settings work
 
