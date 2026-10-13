@@ -2,9 +2,11 @@
 
 ## This repo is a template, not a plugin
 
-**Nothing in `my-plugin/` runs as-is inside feedBack.** `my-plugin` is not
-a real plugin id — it's a placeholder directory meant to be copied,
-renamed, and rewritten. Until that happens:
+`my-plugin` is not a real plugin id — it's a placeholder directory meant to
+be copied, renamed, and rewritten. As shipped it does mount as a working
+demo (the counter screen, settings panel, and settings routes all function),
+so you can install it and watch it run before renaming. Treat every
+identifier as a placeholder regardless:
 
 - `my-plugin/plugin.json`'s `id: "my-plugin"` and the folder name
   `my-plugin/` are meant to be changed together. The plugin-spec (see
@@ -20,12 +22,13 @@ renamed, and rewritten. Until that happens:
   of the mechanics (client screen ↔ server-persisted settings ↔ namespaced
   routes), not a feature worth keeping — replace it with whatever the real
   plugin actually does.
-- `plugin.json` declares `"type": "visualization"`, but nothing here
-  implements the `setRenderer` viz-renderer contract (no
-  `window.feedBackViz_<id>` factory, no `contextType`/`init`/`draw`/
-  `resize`/`destroy`). If the real plugin isn't a highway visualization,
-  drop or change `type`; if it is one, the renderer contract has to be
-  built from scratch — this template doesn't demonstrate it.
+- `plugin.json` declares `"type": "utility"` to match what the example
+  actually is (a settings screen, not a note-highway renderer). The
+  `visualization` type is reserved for plugins implementing the
+  `setRenderer` contract (a `window.feedBackViz_<id>` factory with
+  `contextType`/`init`/`draw`/`resize`/`destroy`); this template doesn't
+  demonstrate that, so set `type` back to `visualization` only if your real
+  plugin builds that renderer from scratch.
 
 If you're asked to "fix" or "improve" something in `my-plugin/` in the
 abstract, without a rename already having happened, the most useful thing
@@ -77,19 +80,17 @@ Two corrections to it, both load-bearing enough to call out here rather
 than silently fix in place:
 
 - **The container-mount convention** ("screen.js finds its own root via
-  `document.getElementById('plugin-<id>')`") is incomplete: the Host only
-  creates that container when the manifest declares a top-level `screen`
-  key (its `has_screen` gate — `plugins/__init__.py`'s
-  `"has_screen": bool(manifest.get("screen"))`, consumed by
-  `static/js/plugin-loader.js`'s container-creation site). `script` is
-  injected independently of `has_screen`, so a script-only manifest still
-  runs `screen.js` against a DOM where that container was never created.
-  `my-plugin/plugin.json` in this template has **no** `screen` key (and
-  no `screen.html` file), so `plugin-my-plugin` is never created as
-  shipped, `screen.js`'s root resolves to `null`, and the checklist's
-  "clicking the counter button" step doesn't apply until a real plugin
-  adds both `"screen": "screen.html"` to its manifest **and** the file
-  itself.
+  `document.getElementById('plugin-<id>')`") is gated on the manifest
+  declaring a top-level `screen` key (the Host's `has_screen` gate —
+  `plugins/__init__.py`'s `"has_screen": bool(manifest.get("screen"))`,
+  consumed by `static/js/plugin-loader.js`'s container-creation site).
+  `script` is injected independently of `has_screen`, so a script-only
+  manifest runs `screen.js` against a DOM where that container was never
+  created. This template now declares `"screen": "screen.html"` and ships
+  the file, so `plugin-my-plugin` is created and the example mounts. Note
+  the current Host hardcodes the fetch path — it always requests
+  `/api/plugins/<id>/screen.html` and ignores the manifest value — so the
+  markup file has to be named `screen.html`.
 - **The folder/id mismatch consequence** ("a mismatch is a silent skip at
   plugin discovery") is spec language, not what the shipped
   `get-flashbacks/feedBack` Host actually does — see the note in "This

@@ -29,9 +29,14 @@ jobs:
           plugin_dir = Path('my-plugin')
           manifest = json.loads((plugin_dir / 'plugin.json').read_text(encoding='utf-8'))
           assert manifest['id'] == plugin_dir.name
-          for key in ('script', 'styles', 'routes'):
+          for key in ('script', 'screen', 'styles', 'routes'):
               assert (plugin_dir / manifest[key]).is_file(), f'missing {key}: {manifest[key]}'
           assert (plugin_dir / manifest['settings']['html']).is_file()
+          # The Host mounts every screen from `/api/plugins/<id>/screen.html`,
+          # ignoring the manifest path, and creates the container as
+          # `plugin-<id>`; a mismatch leaves a dead sidebar entry.
+          assert manifest['screen'] == 'screen.html', manifest['screen']
+          assert manifest['nav']['screen'] == f"plugin-{manifest['id']}", manifest['nav']
           for section in ('settings', 'diagnostics'):
               for entry in (manifest.get(section, {}) or {}).get('server_files', []) or []:
                   parts = entry.split('/')
@@ -42,3 +47,7 @@ jobs:
       - name: Reject print calls in routes
         run: |
           ! grep -nE '(^|[^A-Za-z0-9_])(print|traceback\.print_exc)[[:space:]]*\(' my-plugin/routes.py
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run plugin tests
+        run: pytest -q

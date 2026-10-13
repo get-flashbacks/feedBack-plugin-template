@@ -27,8 +27,10 @@ A reference template for creating [feedBack plugins](https://github.com/got-feed
 2. **Update the manifest:** Edit `your-plugin/plugin.json`:
    - Change `"id"` to match your folder name (e.g., `"your-plugin"`)
    - Update `name`, `version`, `description`, `type`, `icon`
+   - Update the hard-coded `PLUGIN_ID` in `screen.js`, `settings.html`, and `routes.py` (including the `nav.screen` value in `plugin.json`) so the screen lookup and `/api/plugins/<id>/...` routes follow the new id
 
 3. **Customize the plugin:** Edit the files in your plugin directory:
+   - `screen.html` — Client screen markup (the counter and settings display)
    - `screen.js` — Client-side screen logic
    - `settings.html` — Settings panel markup and behavior
    - `routes.py` — Server-side logic and persistence
@@ -38,13 +40,29 @@ A reference template for creating [feedBack plugins](https://github.com/got-feed
 
 5. **Reload plugins:** Restart feedBack or use the plugin manager to reload. Your plugin should appear in the plugin list.
 
+## Verify the example runs
+
+The automated checks (the same ones `custom-checks.yml` runs in CI):
+
+```bash
+pip install -r requirements-dev.txt   # test-only deps: fastapi, httpx, pytest
+pytest -q
+```
+
+The suite covers the manifest/screen mount contract and the settings routes (GET defaults, POST/persistence, invalid and unknown values, malformed JSON, and the 16 KiB body limit).
+
+To see the example live, install `my-plugin/` into feedBack (step 4 above), reload, and check the "My Plugin" sidebar entry:
+
+1. Click **Increment** — the counter climbs.
+2. Open the plugin's settings panel, change the color, click **Save Settings**, then reopen the screen — the "Active color" display reflects the saved value, served from `/api/plugins/my-plugin/settings`.
+
 ## What's included
 
 ### `my-plugin/`
 
 A complete, working plugin that demonstrates:
 
-- A **client screen** (`screen.js`) with lifecycle management
+- A **client screen** (`screen.html` markup + `screen.js` logic) with lifecycle management
 - **Settings persistence** (HTML form + server routes)
 - **Server routes** (`routes.py`) for reading/writing settings
 - **Styling** (`assets/plugin.css`) scoped to the plugin
