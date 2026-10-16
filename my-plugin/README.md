@@ -89,6 +89,7 @@ Update `routes.py` to handle any server-side logic:
 - Namespace all routes under `/api/plugins/<id>/...` to avoid collisions.
 - Validate configuration before registering any route.
 - Read/write only inside `context["config_dir"]` — never elsewhere.
+- Persist settings atomically (temp file + `os.replace`) and serialize concurrent updates (an `asyncio.Lock` held across the whole read–merge–write), so overlapping requests don't drop each other's changes and an interrupted write can't corrupt the config. The example demonstrates both.
 
 ### 6. Edit the styles
 
@@ -118,6 +119,15 @@ The tests discover the plugin by scanning for `plugin.json`, so they keep workin
 5. **Client updates screen:** Refresh the display with the new values.
 
 The template includes working examples of this flow in `settings.html` and `routes.py`.
+
+### Concurrency and durability
+
+Settings writes in this example are safe for concurrent requests within one server process:
+
+- **Serialized updates.** `POST` holds an `asyncio.Lock` across the whole read–merge–write, so overlapping subset updates observe each other's changes instead of overwriting them. Two requests that each change a different setting both survive.
+- **Atomic writes.** The server writes to a temporary file in `config_dir`, flushes it to disk, then replaces `<id>.json` with `os.replace`. Readers only ever see a complete document, and a failed or interrupted write leaves the previous configuration untouched (the request returns `500`). `tempfile.mkstemp` creates the temporary file owner-only, so the resulting config ends up with mode `0600` on POSIX; `chmod` it afterwards if other users need to read it.
+
+**Multi-process limitation.** The lock lives in a single process's event loop, so it does not coordinate across processes. If you run multiple workers that share one `config_dir`, add a cross-process lock (`fcntl.flock`/`msvcrt.locking`, or an external mutex) around the read–merge–write; atomic `os.replace` still prevents torn files, but last-writer-wins can drop a concurrent update.
 
 ## Common tasks
 

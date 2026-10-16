@@ -46,12 +46,16 @@ def routes_module(plugin_dir: Path, manifest: dict):
 
 
 @pytest.fixture()
-def client(plugin_dir: Path, manifest: dict, routes_module, tmp_path: Path) -> TestClient:
+def client(plugin_dir: Path, manifest: dict, routes_module, tmp_path: Path):
     app = FastAPI()
     routes_module.setup(
         app, {"config_dir": tmp_path, "log": logging.getLogger("plugin-tests")}
     )
-    return TestClient(app)
+    # Enter the context manager so every request shares one event loop/portal.
+    # The routes serialize writes with an asyncio.Lock, which is bound to the
+    # loop it is first awaited on; a per-request loop would reject it.
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 @pytest.fixture()

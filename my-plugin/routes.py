@@ -5,12 +5,18 @@ Demonstrates spec §7 best practices:
   * all work happens inside setup() — nothing at import time;
   * configuration is read tolerantly (missing file => defaults);
   * routes are namespaced under the plugin id;
-  * setup() validates before registering any route.
+  * setup() validates before registering any route;
+  * settings writes are serialized (asyncio.Lock) and atomic
+    (temp file + os.replace), so overlapping updates cannot
+    overwrite each other and a failed write cannot corrupt
+    the stored configuration.
 """
 
 import asyncio
 import json
 import logging
+import os
+import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -37,6 +43,31 @@ def _is_valid_setting(name: str, value: object) -> bool:
     return False
 
 
+def _write_settings_atomically(config_file: Path, settings: dict) -> None:
+    """Persist settings so the destination only ever holds a complete file.
+
+    Writes to a temporary file in the same directory, flushes it to disk, then
+    atomically replaces the destination with os.replace. A failure at any point
+    leaves the previous configuration intact and removes the temporary file.
+    """
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=config_file.parent, prefix=f".{config_file.name}.", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(settings, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, config_file)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
 def setup(app: FastAPI, context: dict) -> None:
     """Register routes for my-plugin.
 
@@ -47,6 +78,10 @@ def setup(app: FastAPI, context: dict) -> None:
     config_dir = Path(context["config_dir"])
     log = context.get("log") or logging.getLogger(f"feedBack.plugin.{PLUGIN_ID}")
     config_file = config_dir / f"{PLUGIN_ID}.json"
+
+    # Serializes the whole read-merge-write for concurrent requests on this
+    # event loop. See the README for the multi-process limitation.
+    settings_lock = asyncio.Lock()
 
     def _read() -> dict:
         """Read persisted settings, tolerating a missing or corrupt file."""
@@ -138,15 +173,20 @@ def setup(app: FastAPI, context: dict) -> None:
         def _merge_and_persist() -> dict:
             """Merge incoming settings with existing ones and persist. Runs
             off the event loop (asyncio.to_thread below) since _read() and
-            the write below are blocking filesystem calls, and set_settings
-            must stay `async def` to stream the request body above."""
+            the write are blocking filesystem calls, and set_settings must
+            stay `async def` to stream the request body above."""
             merged = {**_read(), **incoming}
-            config_dir.mkdir(parents=True, exist_ok=True)
-            config_file.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            _write_settings_atomically(config_file, merged)
             return merged
 
         try:
-            merged = await asyncio.to_thread(_merge_and_persist)
+            # Hold the lock across the full read-merge-write so concurrent
+            # subset updates observe each other's changes instead of
+            # overwriting them (last writer wins on stale data). The lock
+            # only covers this process; see the README for multi-process
+            # deployments.
+            async with settings_lock:
+                merged = await asyncio.to_thread(_merge_and_persist)
             log.info("%s: settings updated", PLUGIN_ID)
         except Exception as exc:
             log.error("%s: failed to write settings: %s", PLUGIN_ID, exc)
