@@ -12,7 +12,7 @@ A reference implementation demonstrating the fundamental feedBack plugin contrac
 | `my-plugin/screen.html` | Client screen markup — mounted into `plugin-my-plugin` by the Host, holds the counter and settings hooks `screen.js` queries |
 | `my-plugin/screen.js` | Client screen logic — finds its root by `plugin-<id>`, wires up an example counter, loads persisted settings |
 | `my-plugin/settings.html` | Settings panel markup, grouped under `settings.category` |
-| `my-plugin/routes.py` | FastAPI `setup(app, context)` — registers GET/POST `/api/plugins/my-plugin/settings` with schema validation and persistence |
+| `my-plugin/routes.py` | FastAPI `setup(app, context)` — registers GET/POST `/api/plugins/my-plugin/settings` with schema validation and serialized, atomic persistence |
 | `my-plugin/assets/plugin.css` | Styling scoped to the plugin |
 | `my-plugin/README.md` | Per-plugin documentation for whoever copies this template |
 | `tests/` | pytest suite for the manifest/screen contract and the settings routes |
@@ -25,7 +25,7 @@ A reference implementation demonstrating the fundamental feedBack plugin contrac
 - **GET response:** current settings, merged with defaults for any missing keys
 - **POST body:** a JSON object containing a subset of recognized settings; unknown keys or invalid values return `400`
 - **POST limits:** request body capped at `MAX_SETTINGS_BODY_BYTES` (16 KiB); oversized or malformed bodies return `413`/`400`
-- **Persistence:** settings are written to `<config_dir>/my-plugin.json` off the event loop via `asyncio.to_thread`
+- **Persistence:** settings are written to `<config_dir>/my-plugin.json` off the event loop via `asyncio.to_thread`; concurrent writes are serialized by an `asyncio.Lock` and applied atomically (temp file + `os.replace`), so a failed write preserves the last valid config
 
 ## Key conventions (feedBack plugin contract)
 
@@ -44,6 +44,8 @@ A reference implementation demonstrating the fundamental feedBack plugin contrac
 - `screen.js` uses a `window[\`__${PLUGIN_ID}_setup\`]` guard to avoid double-initializing on re-hydration.
 - `loadSettings()` fails soft on fetch errors (`console.warn`) rather than throwing, so a settings-load failure degrades the screen instead of crashing it.
 - `_is_valid_setting()` in `routes.py` uses `type(value) is int` / `type(value) is bool` (not `isinstance`) specifically to reject `bool` being accepted where `int` is expected (Python's `bool` is an `int` subclass).
+- `routes.py` serializes the whole read–merge–write with an `asyncio.Lock` and persists via `_write_settings_atomically()` (temp file in the same directory + `os.replace`). The lock is per-process only — multiple workers sharing a `config_dir` would need a cross-process lock; `os.replace` still prevents torn files. The guarantee also assumes each handler runs to completion: cancelling the task mid-`asyncio.to_thread` releases the lock while the worker thread finishes anyway.
+- The test fixture uses `with TestClient(app) as client:` on purpose: every request must share one event loop, otherwise a per-request loop rejects the `asyncio.Lock` bound by the first request.
 
 ## Verification checklist
 
@@ -63,6 +65,7 @@ Against a running Host with `my-plugin/` installed:
 5. POSTing a valid settings subset persists and is reflected on next GET
 6. POSTing an unknown key or invalid value returns `400`
 7. Oversized POST body returns `413`
+8. Concurrent POSTs to different settings keys all persist — no lost updates (the `asyncio.Lock` in `routes.py` serializes them)
 
 ## Common pitfalls
 

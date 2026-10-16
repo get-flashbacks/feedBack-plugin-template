@@ -20,5 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `my-plugin/plugin.json` `type` is now `"utility"` instead of `"visualization"`, matching what the example actually is; the `visualization` type is reserved for plugins that implement the `setRenderer` note-highway contract.
 
+### Fixed
+
+- `my-plugin/routes.py` now serializes the full read–merge–persist with an `asyncio.Lock` and writes settings atomically (temp file + `os.replace`), so concurrent subset `POST`s no longer overwrite each other and a failed or interrupted write preserves the last valid configuration. Covered by an overlapping-request test and a failed-write test; the single-process scope of the lock is documented in `my-plugin/README.md` and `AGENTS.md`.
+
 
 <!-- Add entries under Added, Changed, Deprecated, Removed, Fixed, or Security as changes land. -->

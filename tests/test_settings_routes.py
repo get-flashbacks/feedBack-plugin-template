@@ -6,6 +6,7 @@ without mutating stored state.
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,52 @@ def test_post_oversized_streamed_body_is_rejected(client, settings_url) -> None:
             yield b"x" * 1024
 
     assert client.post(settings_url, content=chunks()).status_code == 413
+
+
+def test_overlapping_updates_to_different_settings_are_all_retained(
+    client, settings_url
+) -> None:
+    """Concurrent subset POSTs must serialize read-merge-write.
+
+    Without serialization each request reads the same snapshot and the last
+    write wins, silently dropping the other updates.
+    """
+    bodies = [
+        {"color": "crimson"},
+        {"intensity": 9},
+        {"enable_animations": False},
+    ]
+    with ThreadPoolExecutor(max_workers=len(bodies)) as pool:
+        statuses = list(
+            pool.map(lambda body: client.post(settings_url, json=body).status_code, bodies)
+        )
+
+    assert statuses == [200, 200, 200]
+    assert client.get(settings_url).json() == {
+        "color": "crimson",
+        "intensity": 9,
+        "enable_animations": False,
+    }
+
+
+def test_failed_write_preserves_last_valid_config(
+    client, settings_url, manifest: dict, tmp_path: Path, routes_module, monkeypatch
+) -> None:
+    config_file = tmp_path / f"{manifest['id']}.json"
+    assert client.post(settings_url, json={"color": "crimson"}).status_code == 200
+    before = config_file.read_text(encoding="utf-8")
+
+    def boom(src, dst):
+        raise OSError("simulated write failure")
+
+    # Fail the final rename so the temp file was already written: the handler
+    # must clean it up and leave the previous configuration untouched.
+    monkeypatch.setattr(routes_module.os, "replace", boom)
+
+    res = client.post(settings_url, json={"intensity": 9})
+    assert res.status_code == 500
+
+    assert client.get(settings_url).json() == {**DEFAULTS, "color": "crimson"}
+    assert config_file.read_text(encoding="utf-8") == before
+    assert json.loads(before) == {**DEFAULTS, "color": "crimson"}
+    assert list(tmp_path.glob(".*.tmp")) == []
