@@ -4,6 +4,23 @@
 
 A reference implementation demonstrating the fundamental feedBack plugin contract: a client screen, a server-persisted settings panel, and namespaced server routes. It is meant to be copied and renamed, not used as-is.
 
+This file is the authoritative guide for development in this repo. `CLAUDE.md` covers template-vs-plugin context and points here instead of restating or correcting these rules. The normative plugin contract lives in the spec below.
+
+## Contract sources
+
+The contract has two sources, and they do not always agree:
+
+| Source | Repository | Pinned revision | What it is |
+|---|---|---|---|
+| Specification (normative) | [`get-flashbacks/feedBack-plugin-spec`](https://github.com/get-flashbacks/feedBack-plugin-spec) — `spec/plugin-spec-v1.md`, `schemas/plugin.schema.json` | [`3d653d1`](https://github.com/get-flashbacks/feedBack-plugin-spec/tree/3d653d1ffedfeed7173f23359e48a964a80d84ac) | The MUST/SHOULD rules a plugin is validated against. |
+| Host (observed) | [`get-flashbacks/feedBack`](https://github.com/get-flashbacks/feedBack) — `plugins/__init__.py`, `static/js/plugin-loader.js` | [`ff8984a`](https://github.com/get-flashbacks/feedBack/tree/ff8984ace37714be2eb00c61f1fe4c5b2bd4ecc3) | What the shipped app actually does. |
+
+Both are org forks of the upstream `got-feedBack/*` repos. These revisions are the ones this template was audited against; bump them when you re-verify. To settle a contract question, fetch the named file at the pinned revision and read it rather than trusting prose — for example:
+
+```bash
+curl -s https://raw.githubusercontent.com/get-flashbacks/feedBack/ff8984ace37714be2eb00c61f1fe4c5b2bd4ecc3/plugins/__init__.py | grep -n has_screen
+```
+
 ## Files
 
 | File | Purpose |
@@ -29,15 +46,34 @@ A reference implementation demonstrating the fundamental feedBack plugin contrac
 
 ## Key conventions (feedBack plugin contract)
 
-- **plugin.json id must match directory name** — `my-plugin` == `my-plugin/`
+- **`id` is the plugin's identity.** It keys the nav entry, the settings store, the routes namespace, and the `plugin-<id>` screen container. Folder name and manifest `id` should match (see *Spec vs. shipped Host*).
 - **Nav screen** uses `"nav": { "label": "My Plugin", "screen": "plugin-my-plugin" }`
-- **Screen markup** is declared with a top-level `screen` key and lives in `screen.html`; the Host creates the `plugin-<id>` container from that key and injects the markup, then runs `script`. The current Host hardcodes the fetch path (`/api/plugins/<id>/screen.html`) and ignores the manifest value, so the file must be named `screen.html`.
+- **A screen mounts only when the manifest declares a top-level `screen` key.** The Host creates the `plugin-<id>` container only when `bool(manifest.get("screen"))` (`has_screen`); `script` is injected independently, so a script-only manifest runs `screen.js` against a DOM where that container was never created. The current Host hardcodes the fetch to `/api/plugins/<id>/screen.html` and ignores the manifest value, so the file must be named `screen.html`.
 - **screen.js finds its own root** via `document.getElementById('plugin-<id>')` — the Host injects markup into that container
 - **Settings persist server-side**, not in browser storage — always go through the plugin's own routes
 - **routes.py exports `setup(app, context)`** — receives the FastAPI app and a context dict with `config_dir` and `log`
 - **Configuration validation happens once in `setup()`**, before any route is registered, so a broken config fails plugin load loudly rather than failing silently on first request
 - **API path** is `/api/plugins/<plugin_id>/<route>`
 - **No build step** — vanilla JS, no npm; the Python tests run under `pytest` (see `requirements-dev.txt`)
+
+### Spec vs. shipped Host
+
+The normative rules and the shipped Host do not always agree. When they differ, follow the Host for code that has to run today and the spec for anything that has to stay portable — and say which one you mean.
+
+- **A folder/id mismatch is not discovery-fatal in the shipped Host.** Spec §5.2 says a directory is loaded "only when the directory name equals the manifest `id`", and §4.2 says a Host "MUST NOT treat it as bundled and SHOULD skip or warn". The shipped Host instead registers every subdirectory by its manifest `id` whatever the folder is called (`plugins/__init__.py`), and the folder name only feeds `_is_bundled()` for duplicate resolution. Match them anyway — the spec is stricter, and relying on the Host's leniency is not a documented contract.
+- **The screen container is Host-gated.** Spec §6.1 describes mounting "for each ready plugin that declares a `screen`"; the Host implements exactly that (`has_screen == bool(manifest.get("screen"))` in `plugins/__init__.py`). The `screen` value itself is ignored — `plugin-loader.js` always fetches `/api/plugins/<id>/screen.html` — so the markup file must be named `screen.html`.
+
+## Renaming this template into a real plugin
+
+`my-plugin` is a placeholder id. Change every occurrence together, or the screen lookup and the `/api/plugins/<id>/...` routes will point at the old name:
+
+1. Rename the directory to your new id: `git mv my-plugin your-plugin`.
+2. `your-plugin/plugin.json` — `id` (must equal the folder name); also `name`, `version`, `description`, `type`, `icon`, and `nav.screen` (stays `plugin-<id>`).
+3. `your-plugin/screen.js` — the `PLUGIN_ID` constant.
+4. `your-plugin/settings.html` — the `PLUGIN_ID` constant.
+5. `your-plugin/routes.py` — the `PLUGIN_ID` constant (it derives the route namespace).
+
+Keep the id lowercase (`^[a-z0-9][a-z0-9_-]*$`). The id is permanent: changing it later orphans users' saved settings. The `tests/` suite discovers the plugin by scanning for `plugin.json` and reads the id from the manifest, so it keeps passing after a rename without edits.
 
 ## Known issues / code notes
 
@@ -47,14 +83,21 @@ A reference implementation demonstrating the fundamental feedBack plugin contrac
 - `routes.py` serializes the whole read–merge–write with an `asyncio.Lock` and persists via `_write_settings_atomically()` (temp file in the same directory + `os.replace`). The lock is per-process only — multiple workers sharing a `config_dir` would need a cross-process lock; `os.replace` still prevents torn files. The guarantee also assumes each handler runs to completion: cancelling the task mid-`asyncio.to_thread` releases the lock while the worker thread finishes anyway.
 - The test fixture uses `with TestClient(app) as client:` on purpose: every request must share one event loop, otherwise a per-request loop rejects the `asyncio.Lock` bound by the first request.
 
-## Verification checklist
+## Verification and completion criteria
 
-Automated (the same checks `custom-checks.yml` runs):
+Exact commands, from the repo root (a venv keeps the test deps out of the system env):
 
 ```bash
+python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest -q
 ```
+
+A change to this repo is complete when:
+
+1. `pytest -q` passes.
+2. The `custom-checks.yml` steps pass locally and in CI on the PR — manifest validation, `node --check my-plugin/screen.js`, and no `print(` in `routes.py`. `custom-checks.yml` carries the exact commands.
+3. Every doc claim about the contract still holds against the pinned revisions in *Contract sources*.
 
 Against a running Host with `my-plugin/` installed:
 
@@ -69,6 +112,7 @@ Against a running Host with `my-plugin/` installed:
 
 ## Common pitfalls
 
-- **Folder name must equal `plugin.json` id**, including case
+- **Folder name should equal `plugin.json` id**, including case — the spec requires it, even though the shipped Host tolerates a mismatch (see *Spec vs. shipped Host*)
 - **Route collisions** — always prefix with `/api/plugins/<id>/`
+- **A script-only manifest renders nothing** — declare a top-level `screen` key and name the file `screen.html` or the Host never creates the container
 - **FastAPI POST routes** need `from fastapi import Request` and `async def route(request: Request)` reading the body via a bounded stream, not `await request.json()` directly, if you want the size cap to apply before full deserialization

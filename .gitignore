@@ -2,3 +2,6 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Virtualenv created by the documented setup steps
+.venv/

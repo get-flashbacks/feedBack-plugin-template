@@ -1,12 +1,12 @@
 # feedBack Plugin Template
 
-A reference template for creating [feedBack plugins](https://github.com/got-feedBack/feedback-plugin-spec).
+A reference template for creating [feedBack plugins](https://github.com/get-flashbacks/feedBack-plugin-spec).
 
 ## ⚠️ DISCLAIMER AND WARRANTY
 
 **This template is provided "AS-IS" without any warranty of any kind, express or implied.** No warranty is given that this template is correct, complete, safe, or fit for any particular purpose.
 
-**You MUST read and follow the official [Plugin Specification](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/plugin-spec-v1.md) before creating a plugin.** This template is an example that demonstrates some common patterns, but:
+**You MUST read and follow the official [Plugin Specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md) before creating a plugin.** This template is an example that demonstrates some common patterns, but:
 
 - The specification is the authoritative reference. This template may not cover all requirements.
 - You are responsible for ensuring your plugin complies with the specification.
@@ -36,7 +36,7 @@ A reference template for creating [feedBack plugins](https://github.com/got-feed
    - `routes.py` — Server-side logic and persistence
    - `assets/plugin.css` — Styling
 
-4. **Drop into feedBack:** Copy your plugin folder into the feedBack plugins directory (default: `~/.config/feedback/plugins/` on Linux, or the platform equivalent).
+4. **Drop into feedBack:** Copy your plugin folder into one of the Host's plugin directories — the in-tree `plugins/` directory, or a directory named by the `FEEDBACK_PLUGINS_DIR` environment variable (spec §5.1) — or install it through the in-app Plugin Manager.
 
 5. **Reload plugins:** Restart feedBack or use the plugin manager to reload. Your plugin should appear in the plugin list.
 
@@ -68,27 +68,29 @@ A complete, working plugin that demonstrates:
 - **Styling** (`assets/plugin.css`) scoped to the plugin
 - **Documentation** (`README.md`) with common tasks and tips
 
-Each file is heavily commented and shows best practices from the [Plugin Specification](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/plugin-spec-v1.md).
+Each file is heavily commented and shows best practices from the [Plugin Specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md).
 
 ## Key concepts
 
 ### The folder name must match the `id`
 
-This is the most common cause of "why won't my plugin load?" The folder name and manifest `id` must be **exactly identical**, including case.
+The [specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md) makes the directory name the plugin's identity and requires it to equal the manifest `id` exactly (§5.2), including case — it calls a mismatch the most common discovery failure.
 
 ```
-tuner/                  ✅ Loads as id: "tuner"
+tuner/                  ✅ directory name == id
 ├── plugin.json        →  {"id": "tuner", ...}
 └── ...
 
-Tuner/                  ❌ Will not load (name doesn't match id)
+Tuner/                  ❌ spec-invalid (name doesn't match id)
 ├── plugin.json        →  {"id": "tuner", ...}
 └── ...
 ```
+
+The shipped Host is currently more permissive — it registers a plugin by its manifest `id` regardless of the folder name, and the directory name only affects `bundled` duplicate resolution — but that leniency is not a documented contract, so match them anyway. `AGENTS.md` spells out this and the other spec-vs-Host differences, along with the copy/rename checklist.
 
 ### Settings are server-persisted
 
-Settings are stored server-side in the Host's config directory (usually `~/.config/feedback/plugins/<id>/<id>.json`), not in browser storage. Always fetch/post through your routes:
+Settings are stored server-side in the Host's config directory (`context["config_dir"]`) as `<id>.json`, not in browser storage. Always fetch/post through your routes:
 
 ```javascript
 // Load
@@ -129,9 +131,10 @@ See the template's `screen.js` for the pattern.
 
 ## Further reading
 
-- **[Plugin Specification](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/plugin-spec-v1.md)** — The normative contract. Start here if something doesn't work.
-- **[Best Practices Guide](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/best-practices.md)** — Non-normative advice on building good plugins.
-- **[Full Example Plugin](https://github.com/get-flashbacks/feedback-plugin-spec/tree/main/examples/full-plugin)** — Another worked example in the spec repo.
+- **[Plugin Specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md)** — The normative contract. Start here if something doesn't work.
+- **[Best Practices Guide](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/best-practices.md)** — Non-normative advice on building good plugins.
+- **[Full Example Plugin](https://github.com/get-flashbacks/feedBack-plugin-spec/tree/main/examples/full-plugin)** — Another worked example in the spec repo.
+- **`AGENTS.md`** — The development guide for this repo: the contract's spec and Host sources with the revisions this template was verified against, the spec-vs-Host differences, the copy/rename checklist, and the verification and completion criteria.
 
 ## Troubleshooting
 

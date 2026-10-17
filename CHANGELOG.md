@@ -13,11 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tests/` and `requirements-dev.txt` — pytest coverage for the manifest/screen contract (declared files exist, the screen path the Host fetches, the nav container id) and the settings routes (GET defaults, valid-subset POST/persistence, invalid/unknown values, malformed JSON, and the 16 KiB body limit).
 - `custom-checks.yml` now fails when the `screen` file or nav container reference is missing and runs `pytest`.
 - `nav` field in `my-plugin/plugin.json` (`{ "label": "My Plugin", "screen": "plugin-my-plugin" }`) so the plugin registers a sidebar entry.
-- `AGENTS.md` — reference guide for AI assistants/contributors covering the actual API shape, plugin conventions, known code notes, and a verification checklist.
-- `CLAUDE.md` — agent guide covering the template-vs-plugin distinction, feedBack app context, and two corrections to `AGENTS.md` (the `screen`-key container gate, and the spec-vs-Host folder/id mismatch behavior).
+- `AGENTS.md` — the authoritative development guide: the contract's spec and Host sources with the pinned revisions this template was verified against, the actual API shape, the plugin conventions with the spec-vs-Host differences called out, a copy/rename checklist, known code notes, and verification/completion criteria.
+- `CLAUDE.md` — agent guide covering the template-vs-plugin distinction and feedBack app context; it defers to `AGENTS.md` rather than restating or correcting it.
 
 ### Changed
 
+- Unified the docs around the actual plugin contract. `AGENTS.md` now folds in and owns the spec-vs-Host notes `CLAUDE.md` previously carried as corrections; the READMEs no longer claim a folder/id mismatch "will not load" (the spec requires them to match, but the shipped Host tolerates a mismatch), name the Host's real plugin-discovery directories, and state the settings store as `<config_dir>/<id>.json`. Spec links use the canonical `get-flashbacks/feedBack-plugin-spec` name. `.gitignore` now ignores the `.venv/` the documented setup creates.
 - `my-plugin/plugin.json` `type` is now `"utility"` instead of `"visualization"`, matching what the example actually is; the `visualization` type is reserved for plugins that implement the `setRenderer` note-highway contract.
 
 ### Fixed
