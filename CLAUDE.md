@@ -9,13 +9,10 @@ so you can install it and watch it run before renaming. Treat every
 identifier as a placeholder regardless:
 
 - `my-plugin/plugin.json`'s `id: "my-plugin"` and the folder name
-  `my-plugin/` are meant to be changed together. The plugin-spec (see
-  below) states a folder/id mismatch is discovery-fatal, but the shipped
-  `get-flashbacks/feedBack` Host is more permissive: the loader registers
-  a plugin by its manifest `id` regardless of folder name, and a
-  mismatch only affects `bundled: true` duplicate-resolution behavior —
-  it isn't a silent skip there. Match them anyway; the spec is stricter,
-  and relying on the Host's leniency is not a documented contract.
+  `my-plugin/` are meant to be changed together. The spec requires them to
+  match; the shipped Host is more permissive. See `AGENTS.md` →
+  *Spec vs. shipped Host* for the exact behavior and *Renaming this template
+  into a real plugin* for the full checklist.
 - Every route in `routes.py` is namespaced `/api/plugins/my-plugin/...` and
   needs the same rename.
 - The counter/settings behavior in `screen.js`/`settings.html` is a demo
@@ -35,6 +32,17 @@ abstract, without a rename already having happened, the most useful thing
 is usually to ask what the real plugin is meant to be, since almost every
 identifier in this tree is a placeholder.
 
+## The authoritative development guide
+
+`@AGENTS.md`
+
+`AGENTS.md` is the single source of truth for this repo: the file table, the
+demo's actual API shape, the feedBack plugin-contract conventions, the
+spec-vs-Host differences (including the folder/id and screen-gate rules), the
+copy/rename checklist, the verification and completion criteria, and common
+pitfalls. This file does not restate or correct it — read `AGENTS.md` before
+acting on anything in this repo.
+
 ## What feedBack is
 
 feedBack is a self-hosted web app for browsing, playing, and practicing
@@ -53,12 +61,13 @@ files loaded at runtime.
 - **Canonical app repo:** `got-feedBack/feedBack`. **This org's fork:**
   `get-flashbacks/feedBack` (personal fork with fork-specific features).
 - **The authoritative plugin contract** lives in
-  [`get-flashbacks/feedback-plugin-spec`](https://github.com/get-flashbacks/feedback-plugin-spec)
+  [`get-flashbacks/feedBack-plugin-spec`](https://github.com/get-flashbacks/feedBack-plugin-spec)
   — this org's own normative fork of the upstream
-  [`got-feedBack/feedback-plugin-spec`](https://github.com/got-feedBack/feedback-plugin-spec).
+  [`got-feedBack/feedBack-plugin-spec`](https://github.com/got-feedBack/feedBack-plugin-spec).
   This repo's own README already states the spec takes precedence over
   anything here if the two conflict. Read the spec before trusting this
-  template's conventions for anything non-obvious.
+  template's conventions for anything non-obvious. `AGENTS.md` pins the
+  spec and Host revisions this template was audited against.
 - feedBack's own `CLAUDE.md` (in the core repo) documents the full plugin
   contract in far more depth than this template attempts to demonstrate:
   the `setRenderer` visualization lifecycle, capability domains
@@ -68,30 +77,3 @@ files loaded at runtime.
   detachable panes, and the v3 player-chrome contract. This template only
   demonstrates the smallest possible slice (screen + settings + routes) —
   don't assume it's a complete reference for anything beyond that slice.
-
-## File map, API shape, conventions, checklist, pitfalls
-
-@AGENTS.md
-
-That file has the file table, the demo's actual API shape, the feedBack
-plugin-contract conventions, known code notes, the verification
-checklist, and common pitfalls — this file doesn't repeat that content.
-Two corrections to it, both load-bearing enough to call out here rather
-than silently fix in place:
-
-- **The container-mount convention** ("screen.js finds its own root via
-  `document.getElementById('plugin-<id>')`") is gated on the manifest
-  declaring a top-level `screen` key (the Host's `has_screen` gate —
-  `plugins/__init__.py`'s `"has_screen": bool(manifest.get("screen"))`,
-  consumed by `static/js/plugin-loader.js`'s container-creation site).
-  `script` is injected independently of `has_screen`, so a script-only
-  manifest runs `screen.js` against a DOM where that container was never
-  created. This template now declares `"screen": "screen.html"` and ships
-  the file, so `plugin-my-plugin` is created and the example mounts. Note
-  the current Host hardcodes the fetch path — it always requests
-  `/api/plugins/<id>/screen.html` and ignores the manifest value — so the
-  markup file has to be named `screen.html`.
-- **The folder/id mismatch consequence** ("a mismatch is a silent skip at
-  plugin discovery") is spec language, not what the shipped
-  `get-flashbacks/feedBack` Host actually does — see the note in "This
-  repo is a template, not a plugin" above.

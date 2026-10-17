@@ -2,7 +2,7 @@
 
 A feedBack plugin template with all common surfaces: client screen, settings panel, and server routes.
 
-**Note:** Before using this template, read the [official Plugin Specification](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/plugin-spec-v1.md). See the template repository's README for important disclaimers and warranty information.
+**Note:** Before using this template, read the [official Plugin Specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md). See the template repository's README for important disclaimers and warranty information.
 
 ## Overview
 
@@ -22,7 +22,7 @@ The plugin persists user settings through its server routes and applies them on 
 
 ### 1. Rename the plugin
 
-Before anything else, choose a unique `id` for your plugin. The folder name **must exactly match** the manifest `id`. This is the most common discovery failure.
+Before anything else, choose a unique `id` for your plugin. The [specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md) requires the folder name to **exactly match** the manifest `id` (§5.2) — it calls a mismatch the most common discovery failure. The shipped Host is more permissive, but match them anyway; the template repo's `AGENTS.md` spells out the spec-vs-Host differences.
 
 - **Rename** the `my-plugin/` folder to your chosen name (e.g., `tuner`, `drum-highway-3d`).
 - **Update** `plugin.json` to set `"id": "<your-new-id>"` to match the folder name.
@@ -219,8 +219,8 @@ The exact API is Host-provided and versioned; check the Host's documentation.
 
 ## Spec reference
 
-- [Plugin Specification](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/plugin-spec-v1.md)
-- [Best Practices Guide](https://github.com/get-flashbacks/feedback-plugin-spec/blob/main/spec/best-practices.md)
+- [Plugin Specification](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/plugin-spec-v1.md)
+- [Best Practices Guide](https://github.com/get-flashbacks/feedBack-plugin-spec/blob/main/spec/best-practices.md)
 
 ## License
 
